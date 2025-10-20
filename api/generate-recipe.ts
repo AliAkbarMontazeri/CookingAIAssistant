@@ -32,29 +32,30 @@ export async function POST(request: Request) {
             sourceUrls: { type: Type.ARRAY, items: { type: Type.STRING }, description: 'An array containing at least one direct URL to the real, online recipe this data was extracted from. This is mandatory.' },
             error: { type: Type.STRING, description: 'If no real, verifiable online recipe can be found, provide a reason here, like "NO_RECIPE_FOUND". Otherwise, this must be null.' },
         },
+        required: ['title', 'description', 'ingredients', 'instructions', 'prepTime', 'cookTime', 'servings', 'sourceUrls'],
     };
 
     const languageMap = { en: 'English', id: 'Indonesian' };
-    // FIX: Refactor to use systemInstruction for better prompt structure and clarity.
-    const systemInstruction = `You are an expert recipe finder. Your ONLY task is to find a single, real, popular, and highly-rated recipe online based on a list of ingredients.
-
-**Rules:**
-- You MUST find a real, existing recipe from a reputable online source.
-- You MUST NOT invent, create, or hallucinate a recipe. Your entire output must be based on a single, existing online source.
-- You MUST provide at least one direct, working URL to the source recipe in the 'sourceUrls' field. Do not use placeholder URLs.
-- If you cannot find a real, verifiable online recipe for the core ingredients, you MUST set the 'error' field in the JSON response to "NO_RECIPE_FOUND". In this case, other fields should be null or empty arrays.
-- Ignore any strange ingredients that don't fit with the others (e.g., 'chicken, tomatoes, chocolate') and find a recipe for the ingredients that do make sense together.
-- Assume basic pantry staples like salt, pepper, oil, and water are available to the user.
-- The entire response, including all text fields, must be in ${languageMap[language as Language]}.
-- Your entire response must be a single JSON object that conforms to the provided schema.`;
-    
-    const prompt = `Find a recipe using these ingredients: ${ingredients.join(', ')}.`;
+    const prompt = `
+    **ROLE:** You are an expert recipe finder. Your ONLY task is to find a single, real, popular, and highly-rated recipe online that can be made with the user's ingredients.
+    **CORE TASK:**
+    1.  Analyze the user's ingredients: ${ingredients.join(', ')}.
+    2.  Search online for a real, existing recipe that uses the main ingredients from this list.
+    3.  If you find a valid recipe, extract its details and populate the JSON object according to the schema.
+    4.  You MUST include at least one direct, working URL to the source recipe in the 'sourceUrls' field. This is not optional.
+    5.  If you CANNOT find a real, verifiable online recipe for the core ingredients, you MUST set the 'error' field in the JSON response to "NO_RECIPE_FOUND" and nothing else.
+    **STRICT RULES (NON-NEGOTIABLE):**
+    -   **DO NOT INVENT A RECIPE.** You are forbidden from creating, combining, or hallucinating a recipe. Your entire output must be based on a single, existing online source.
+    -   **DO NOT USE PLACEHOLDER URLS.** The URL must be a real link to a recipe website.
+    -   If a user-provided ingredient is strange or doesn't fit with the others (e.g., 'chicken, tomatoes, chocolate'), ignore the strange ingredient and find a recipe for the ingredients that do make sense together.
+    -   Assume basic pantry staples like salt, pepper, oil, and water are available.
+    -   The entire response, including all text fields, must be in ${languageMap[language as Language]}.
+    Provide your response as a single JSON object that conforms to the provided schema.`;
 
     const response = await ai.models.generateContent({
         model: model,
         contents: prompt,
         config: {
-            systemInstruction,
             responseMimeType: 'application/json',
             responseSchema: recipeSchema,
         }

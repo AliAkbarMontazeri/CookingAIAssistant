@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "api/generate-recipe.ts": {
-      "memory": 1024,
-      "maxDuration": 15
-    }
-  }
-}
